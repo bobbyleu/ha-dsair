@@ -1202,6 +1202,39 @@ class VentilationQueryCompositeSituationResult(BaseResult):
 # HD 相关的 Result 类
 
 
+def _parse_hd_switch(raw: int, room: int, unit: int, source: str):
+    """解析 HD 开关状态字节。
+
+    协议约定 0=关、1=开。遇到其他值时不再抛 ValueError（否则会导致整条
+    报文被丢弃、实体状态卡死），而是告警并返回 None，保持状态不变。
+    同时用 INFO 日志记录原始值，便于按开/关操作对照确认网关的真实编码。
+    """
+    if raw == EnumControl.Switch.OFF:
+        result = EnumControl.Switch.OFF
+    elif raw == EnumControl.Switch.ON:
+        result = EnumControl.Switch.ON
+    else:
+        result = None
+        _LOGGER.warning(
+            "[DS-AIR HD] %s 收到未知的开关状态原始值 %s (room=%s unit=%s)，"
+            "本字段将被忽略。若开/关设备时该值稳定出现且不为 0/1，"
+            "说明网关的开关编码与当前假设（0=关/1=开）不符，请反馈该日志。",
+            source,
+            raw,
+            room,
+            unit,
+        )
+    _LOGGER.info(
+        "[DS-AIR HD] %s 开关原始值=%s (room=%s unit=%s) -> %s",
+        source,
+        raw,
+        room,
+        unit,
+        result,
+    )
+    return result
+
+
 class HDInfoChangeResult(BaseResult):
     """HD设备状态变化结果"""
     def __init__(self, cmd_id: int, target: EnumDevice):
@@ -1248,7 +1281,9 @@ class HDInfoChangeResult(BaseResult):
             elif flag_byte == 33:  # switchStatus
                 if field_length == 1:
                     switch_value = d.read1()
-                    self._status.switch = EnumControl.Switch(switch_value)
+                    self._status.switch = _parse_hd_switch(
+                        switch_value, self._room, self._unit, "状态推送"
+                    )
                 else:
                     d.read(field_length)
 
@@ -1291,6 +1326,9 @@ class HDQueryStatusResult(BaseResult):
         self._status: HDStatus = HDStatus()
 
     def load_bytes(self, b: bytes, config: Config) -> None:
+        _LOGGER.debug(
+            "[DS-AIR HD] 状态查询响应原始字节: %s", bytes(b).hex(" ")
+        )
         d = Decode(b)
         self._room = d.read1()
         self._unit = d.read1()
@@ -1300,7 +1338,9 @@ class HDQueryStatusResult(BaseResult):
 
         if flag & EnumControl.Type.SWITCH:
             switch_value = d.read1()
-            self._status.switch = EnumControl.Switch(switch_value)
+            self._status.switch = _parse_hd_switch(
+                switch_value, self._room, self._unit, "状态查询"
+            )
 
     def do(self, service: Service) -> None:
         service.set_hd_status(self._room, self._unit, self._status)
@@ -1324,7 +1364,9 @@ class HDStatusChangeResult(BaseResult):
 
         if flag & EnumControl.Type.SWITCH:
             switch_value = d.read1()
-            self._status.switch = EnumControl.Switch(switch_value)
+            self._status.switch = _parse_hd_switch(
+                switch_value, self._room, self._unit, "旧版状态变化"
+            )
 
 
 class HDControlOtherResult(BaseResult):

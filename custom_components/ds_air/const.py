@@ -7,8 +7,8 @@ from homeassistant.components.climate import (
     HVACMode,
 )
 from homeassistant.const import (
-    CONCENTRATION_MICROGRAMS_PER_CUBIC_METER,
     PERCENTAGE,
+    UnitOfDensity,
     UnitOfTemperature,
 )
 from homeassistant.components.sensor import SensorDeviceClass
@@ -198,7 +198,7 @@ SMALL_VAM_SENSOR_TYPES = {
         1,
     ],
     "pm25": [
-        CONCENTRATION_MICROGRAMS_PER_CUBIC_METER,
+        UnitOfDensity.MICROGRAMS_PER_CUBIC_METER,
         "outdoor_pm25",
         SensorDeviceClass.PM25,
         1,

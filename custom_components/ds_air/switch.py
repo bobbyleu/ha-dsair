@@ -59,7 +59,7 @@ class DsHdMuteSwitch(SwitchEntity):
             newstatus = kwargs['status']
             if newstatus.mute is not None:
                 self._device_info.status.mute = newstatus.mute
-                self.hass.loop.call_soon_threadsafe(self.async_write_ha_state)
+                self.schedule_update_ha_state()
 
     @property
     def is_on(self) -> bool | None:
@@ -75,7 +75,7 @@ class DsHdMuteSwitch(SwitchEntity):
         new_status.mute = EnumControl.Switch.ON
         self._device_info.status.mute = EnumControl.Switch.ON
         self.service.hd_control(self._device_info, new_status)
-        self.async_write_ha_state()
+        self.schedule_update_ha_state()
 
     async def async_turn_off(self, **kwargs) -> None:
         """Turn the switch off."""
@@ -84,4 +84,4 @@ class DsHdMuteSwitch(SwitchEntity):
         new_status.mute = EnumControl.Switch.OFF
         self._device_info.status.mute = EnumControl.Switch.OFF
         self.service.hd_control(self._device_info, new_status)
-        self.async_write_ha_state()
+        self.schedule_update_ha_state()

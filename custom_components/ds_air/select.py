@@ -6,6 +6,7 @@ import logging
 from homeassistant.components.select import SelectEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
@@ -78,13 +79,22 @@ class DsVentModeSelect(SelectEntity):
 
     @property
     def device_info(self) -> DeviceInfo:
-        """Return device info."""
-        return DeviceInfo(
+        """Return device info, linking to the gateway via its registry id."""
+        via_device_id = None
+        if self.hass is not None:
+            dev_reg = dr.async_get(self.hass)
+            if parent := dev_reg.async_get_device(
+                identifiers={(DOMAIN, self._device_info.gateway_id)}
+            ):
+                via_device_id = parent.id
+        info = DeviceInfo(
             identifiers={(DOMAIN, self._device_info.unique_id)},
             name=f"新风 {self._device_info.alias}",
             manufacturer=MANUFACTURER,
-            via_device=(DOMAIN, self._device_info.gateway_id),
         )
+        if via_device_id is not None:
+            info["via_device_id"] = via_device_id
+        return info
 
     @property
     def current_option(self) -> str | None:
@@ -144,13 +154,22 @@ class DsVentAirFlowSelect(SelectEntity):
 
     @property
     def device_info(self) -> DeviceInfo:
-        """Return device info."""
-        return DeviceInfo(
+        """Return device info, linking to the gateway via its registry id."""
+        via_device_id = None
+        if self.hass is not None:
+            dev_reg = dr.async_get(self.hass)
+            if parent := dev_reg.async_get_device(
+                identifiers={(DOMAIN, self._device_info.gateway_id)}
+            ):
+                via_device_id = parent.id
+        info = DeviceInfo(
             identifiers={(DOMAIN, self._device_info.unique_id)},
             name=f"新风 {self._device_info.alias}",
             manufacturer=MANUFACTURER,
-            via_device=(DOMAIN, self._device_info.gateway_id),
         )
+        if via_device_id is not None:
+            info["via_device_id"] = via_device_id
+        return info
 
     @property
     def current_option(self) -> str | None:

@@ -30,6 +30,7 @@ from homeassistant.const import (
 )
 from homeassistant.core import Event, HomeAssistant
 from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.event import async_track_state_change_event
@@ -131,7 +132,7 @@ class DsAir(ClimateEntity):
     _attr_target_temperature_high: float | None = None
     _attr_target_temperature_low: float | None = None
     _attr_target_temperature_step: float | None = 0.5
-    _attr_temperature_unit: str = UnitOfTemperature.CELSIUS
+    _attr_native_temperature_unit: str = UnitOfTemperature.CELSIUS
 
     _enable_turn_on_off_backwards_compatibility: bool = False  # used in 2024.2~2024.12
 
@@ -153,7 +154,6 @@ class DsAir(ClimateEntity):
             identifiers={(DOMAIN, self.unique_id)},
             name=build_aircon_device_name(aircon.alias),
             manufacturer=MANUFACTURER,
-            via_device=(DOMAIN, aircon.gateway_id),
         )
         if not self._device_info.config.is_d611:
             # 根据 fan_volume 能力过滤可用风速
@@ -177,6 +177,25 @@ class DsAir(ClimateEntity):
             else:
                 # FIX 或 NO：不支持调速
                 self._attr_fan_modes = []
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        """Link the climate entity to its gateway device via the registry id."""
+        via_device_id = None
+        if self.hass is not None:
+            dev_reg = dr.async_get(self.hass)
+            if parent := dev_reg.async_get_device(
+                identifiers={(DOMAIN, self._device_info.gateway_id)}
+            ):
+                via_device_id = parent.id
+        info = DeviceInfo(
+            identifiers={(DOMAIN, self.unique_id)},
+            name=build_aircon_device_name(self._device_info.alias),
+            manufacturer=MANUFACTURER,
+        )
+        if via_device_id is not None:
+            info["via_device_id"] = via_device_id
+        return info
 
     async def async_added_to_hass(self) -> None:
         if self.linked_temp_entity_id:

@@ -9,6 +9,7 @@ from homeassistant.components.sensor import (
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_HOST
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
@@ -98,17 +99,31 @@ class DsSensor(SensorEntity):
         self.entity_description = description
         self._data_key: str = description.key
 
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, device.unique_id)},
-            name=build_sensor_device_name(device.alias),
-            manufacturer=MANUFACTURER,
-            via_device=(DOMAIN, device.gateway_id),
-        )
+        self._device = device
 
         self._attr_unique_id = f"{self._data_key}_{device.unique_id}"
 
         self._parse_data(device)
         service.register_sensor_hook(device.unique_id, self._handle_sensor_hook)
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        """Link the sensor to its gateway device via the registry id."""
+        via_device_id = None
+        if self.hass is not None:
+            dev_reg = dr.async_get(self.hass)
+            if parent := dev_reg.async_get_device(
+                identifiers={(DOMAIN, self._device.gateway_id)}
+            ):
+                via_device_id = parent.id
+        info = DeviceInfo(
+            identifiers={(DOMAIN, self._device.unique_id)},
+            name=build_sensor_device_name(self._device.alias),
+            manufacturer=MANUFACTURER,
+        )
+        if via_device_id is not None:
+            info["via_device_id"] = via_device_id
+        return info
 
     def _parse_data(self, device: Sensor) -> None:
         """Parse data sent by gateway."""
@@ -138,17 +153,29 @@ class DsVentSensor(SensorEntity):
         self._attr_native_unit_of_measurement = sensor_info[0] if sensor_info else None
         self._attr_device_class = sensor_info[2] if sensor_info else None
 
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, device.unique_id)},
-            name=f"新风 {device.alias}",
-            manufacturer=MANUFACTURER,
-            via_device=(DOMAIN, device.gateway_id),
-        )
-
         self._attr_unique_id = f"{self._data_key}_{device.unique_id}"
 
         self._parse_data(device.status)
         service.register_vent_hook(device, self._handle_vent_hook)
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        """Link the vent sensor to its gateway device via the registry id."""
+        via_device_id = None
+        if self.hass is not None:
+            dev_reg = dr.async_get(self.hass)
+            if parent := dev_reg.async_get_device(
+                identifiers={(DOMAIN, self._device.gateway_id)}
+            ):
+                via_device_id = parent.id
+        info = DeviceInfo(
+            identifiers={(DOMAIN, self._device.unique_id)},
+            name=f"新风 {self._device.alias}",
+            manufacturer=MANUFACTURER,
+        )
+        if via_device_id is not None:
+            info["via_device_id"] = via_device_id
+        return info
 
     def _parse_data(self, status: VentilationStatus) -> None:
         """Parse data sent by gateway."""

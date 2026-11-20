@@ -72,7 +72,7 @@ class DsWaterHeater(WaterHeaterEntity):
     _attr_min_temp: float = 25.0
     _attr_precision: float = PRECISION_TENTHS
     _attr_target_temperature_step: float = 1.0
-    _attr_temperature_unit: str = UnitOfTemperature.CELSIUS
+    _attr_native_temperature_unit: str = UnitOfTemperature.CELSIUS
     _attr_operation_list: list[str] = HD_OPERATION_LIST
     _attr_supported_features: int = _SUPPORT_FLAGS
 
@@ -146,11 +146,16 @@ class DsWaterHeater(WaterHeaterEntity):
             if newstatus.warm_lower is not None:
                 curstatus.warm_lower = newstatus.warm_lower
 
-        self.async_write_ha_state()
+        self.schedule_update_ha_state()
 
     @property
     def current_temperature(self) -> float | None:
         """Return the current temperature."""
+        return self._device_info.status.warm_temperature
+
+    @property
+    def native_target_temperature(self) -> float | None:
+        """Return the target temperature."""
         return self._device_info.status.warm_temperature
 
     @property
@@ -174,7 +179,7 @@ class DsWaterHeater(WaterHeaterEntity):
                 new_status.warm_temperature = temperature
                 status.warm_temperature = temperature
                 self.service.hd_control(self._device_info, new_status)
-                self.async_write_ha_state()
+                self.schedule_update_ha_state()
 
     async def async_set_operation_mode(self, operation_mode: str) -> None:
         """Set new operation mode."""
@@ -194,4 +199,4 @@ class DsWaterHeater(WaterHeaterEntity):
             return
 
         self.service.hd_control(self._device_info, new_status)
-        self.async_write_ha_state()
+        self.schedule_update_ha_state()
