@@ -1,5 +1,9 @@
 # Daikin DS-AIR Custom Component For Home Assistant
 
+> **署名说明 / Attribution**：本集成原作者为 [mypal](https://github.com/mypal/ha-dsair)，原始实现与版权归其所有。本仓库（[bobbyleu/ha-dsair](https://github.com/bobbyleu/ha-dsair)）是由 bobbyleu 基于原项目修订维护的分叉版本，主要进行 Home Assistant 新版本兼容性修复与错误修正，并非从零创作。感谢 mypal 的原创工作。
+>
+> This integration was originally created by [mypal](https://github.com/mypal/ha-dsair). This repository is a fork maintained and revised by bobbyleu, containing compatibility fixes for newer Home Assistant versions and bug fixes. It is not an original work by the maintainer.
+
 此项目是Home Assistant平台[DS-AIR](https://www.daikin-china.com.cn/newha/products/4/19/DS-AIR/)以及[金制空气](https://www.daikin-china.com.cn/newha/products/4/19/jzkq/)自定义组件的实现。
 
 支持的网关设备型号为 DTA117B611、DTA117C611，其他网关的支持情况未知。（DTA117D611 可直接选择 DTA117C611）。同时支持直接云端对接“金制空气”账号，自动统计并同步每日电量消耗。
