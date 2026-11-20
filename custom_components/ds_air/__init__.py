@@ -328,6 +328,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         raise ConfigEntryNotReady(str(exc)) from exc
     _migrate_legacy_sensor_links(hass, entry, service)
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    # 网关仅在状态变化时推送，重启后设备状态未变化，需主动查询一次才能拿到真实状态。
+    # 心跳线程首次 poll 要等约 5.5 分钟（30s + 5×60s），期间 HomeKit 会沿用旧的
+    # “加热至 50°C”。此时实体钩子已注册，立即轮询可让状态在数秒内纠正。
+    try:
+        await hass.async_add_executor_job(service.poll_status)
+    except Exception as exc:
+        _LOGGER.warning("DS-AIR 初始状态轮询失败: %s", exc)
     entry.async_on_unload(entry.add_update_listener(update_listener))
 
     return True

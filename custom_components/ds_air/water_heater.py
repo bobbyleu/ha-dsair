@@ -166,7 +166,8 @@ class DsWaterHeater(WaterHeaterEntity):
     def current_operation(self) -> str | None:
         """Return current operation."""
         if self._device_info.status.switch is None:
-            return None
+            # 尚未收到网关真实状态时按“关闭”显示，避免 HomeKit 沿用旧值误显示“加热中”。
+            return STATE_OFF
         if self._device_info.status.switch == EnumControl.Switch.ON:
             return STATE_HEAT_PUMP
         return STATE_OFF

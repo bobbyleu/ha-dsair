@@ -232,7 +232,10 @@ class HeartBeatThread(Thread):
             if cnt == self.service.get_scan_interval():
                 _log("poll_status")
                 cnt = 0
-                self.service.poll_status()
+                try:
+                    self.service.poll_status()
+                except Exception as exc:
+                    _log(f"poll_status failed (ignored): {exc}")
 
             if self._stop_event.wait(60):
                 return
