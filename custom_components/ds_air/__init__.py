@@ -26,6 +26,7 @@ from .const import (
     SERVICE_GET_POWER_DATA,
 )
 from .coordinator import DsAirPowerCoordinator
+from .device_helpers import find_device
 from .descriptions import SENSOR_DESCRIPTORS
 from .ds_air_service import Config, Service
 from .ds_air_service.dao import migrate_legacy_sensor_links, migrate_legacy_unique_id
@@ -98,8 +99,8 @@ def _migrate_device_registry_identifiers(
                 identifier, gateway_id, SENSOR_DESCRIPTORS
             )
             if new_identifier is not None:
-                conflict_device = device_registry.async_get_device(
-                    identifiers={(domain, new_identifier)}
+                conflict_device = find_device(
+                    hass, (domain, new_identifier), entry.entry_id
                 )
                 if conflict_device and conflict_device.id != device_entry.id:
                     _LOGGER.warning(

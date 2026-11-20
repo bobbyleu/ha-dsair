@@ -13,6 +13,7 @@ from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import DOMAIN, MANUFACTURER
+from .device_helpers import schedule_update_if_enabled
 from .ds_air_service import HD, Service, EnumControl
 
 _LOGGER = logging.getLogger(__name__)
@@ -59,7 +60,7 @@ class DsHdMuteSwitch(SwitchEntity):
             newstatus = kwargs['status']
             if newstatus.mute is not None:
                 self._device_info.status.mute = newstatus.mute
-                self.schedule_update_ha_state()
+                schedule_update_if_enabled(self)
 
     @property
     def is_on(self) -> bool | None:
@@ -75,7 +76,7 @@ class DsHdMuteSwitch(SwitchEntity):
         new_status.mute = EnumControl.Switch.ON
         self._device_info.status.mute = EnumControl.Switch.ON
         self.service.hd_control(self._device_info, new_status)
-        self.schedule_update_ha_state()
+        schedule_update_if_enabled(self)
 
     async def async_turn_off(self, **kwargs) -> None:
         """Turn the switch off."""
@@ -84,4 +85,4 @@ class DsHdMuteSwitch(SwitchEntity):
         new_status.mute = EnumControl.Switch.OFF
         self._device_info.status.mute = EnumControl.Switch.OFF
         self.service.hd_control(self._device_info, new_status)
-        self.schedule_update_ha_state()
+        schedule_update_if_enabled(self)

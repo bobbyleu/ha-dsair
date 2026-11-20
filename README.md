@@ -64,7 +64,7 @@
 
 - 方法二：点击此按钮添加 HACS 自定义存储库 
 
-  [![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=mypal&repository=ha-dsair&category=integration)
+  [![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=bobbyleu&repository=ha-dsair&category=integration)
 
   然后点击右下角 DOWNLOAD 安装
 

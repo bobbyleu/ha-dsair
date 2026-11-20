@@ -23,6 +23,7 @@ from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import DOMAIN, MANUFACTURER
+from .device_helpers import schedule_update_if_enabled
 from .ds_air_service import HD, HDStatus, EnumControl, Service, display
 
 _LOGGER = logging.getLogger(__name__)
@@ -107,9 +108,12 @@ class DsWaterHeater(WaterHeaterEntity):
                 _log(f"[HD Entity] 模式更新: {old_mode} -> {self.current_operation}")
 
             if newstatus.warm_temperature is not None:
-                old_temp = self.target_temperature
+                old_temp = self.native_target_temperature
                 curstatus.warm_temperature = newstatus.warm_temperature
-                _log(f"[HD Entity] 温度更新: {old_temp}°C -> {self.target_temperature}°C")
+                _log(
+                    f"[HD Entity] 温度更新: {old_temp}°C -> "
+                    f"{self.native_target_temperature}°C"
+                )
 
             if newstatus.mute is not None:
                 curstatus.mute = newstatus.mute
@@ -146,10 +150,10 @@ class DsWaterHeater(WaterHeaterEntity):
             if newstatus.warm_lower is not None:
                 curstatus.warm_lower = newstatus.warm_lower
 
-        self.schedule_update_ha_state()
+        schedule_update_if_enabled(self)
 
     @property
-    def current_temperature(self) -> float | None:
+    def native_current_temperature(self) -> float | None:
         """Return the current temperature."""
         return self._device_info.status.warm_temperature
 
@@ -179,7 +183,7 @@ class DsWaterHeater(WaterHeaterEntity):
                 new_status.warm_temperature = temperature
                 status.warm_temperature = temperature
                 self.service.hd_control(self._device_info, new_status)
-                self.schedule_update_ha_state()
+                schedule_update_if_enabled(self)
 
     async def async_set_operation_mode(self, operation_mode: str) -> None:
         """Set new operation mode."""
@@ -199,4 +203,4 @@ class DsWaterHeater(WaterHeaterEntity):
             return
 
         self.service.hd_control(self._device_info, new_status)
-        self.schedule_update_ha_state()
+        schedule_update_if_enabled(self)

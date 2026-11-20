@@ -9,7 +9,6 @@ from homeassistant.components.sensor import (
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_HOST
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
@@ -22,6 +21,7 @@ from .const import (
     SMALL_VAM_SENSOR_TYPES,
 )
 from .coordinator import DsAirPowerCoordinator
+from .device_helpers import get_device_id_by_gateway, schedule_update_if_enabled
 from .descriptions import SENSOR_DESCRIPTORS, DsSensorEntityDescription
 from .ds_air_service import UNINITIALIZED_VALUE, Sensor, Service, Ventilation, VentilationStatus
 from .ds_air_service.dao import build_sensor_device_name
@@ -72,13 +72,18 @@ async def async_setup_entry(
         for key in SENSOR_DESCRIPTORS:
             if config_entry.data.get(key):
                 entities.append(
-                    DsSensor(service, device, SENSOR_DESCRIPTORS.get(key))
+                    DsSensor(
+                        service,
+                        device,
+                        SENSOR_DESCRIPTORS.get(key),
+                        config_entry.entry_id,
+                    )
                 )
     # 新风传感器
     for vent in service.get_ventilations():
         if vent.is_small_vam:
             for key in SMALL_VAM_SENSOR_TYPES:
-                entities.append(DsVentSensor(service, vent, key))
+                entities.append(DsVentSensor(service, vent, key, config_entry.entry_id))
     async_add_entities(entities)
 
 
@@ -94,12 +99,14 @@ class DsSensor(SensorEntity):
         service: Service,
         device: Sensor,
         description: DsSensorEntityDescription,
+        config_entry_id: str,
     ):
         """Initialize the Daikin Sensor."""
         self.entity_description = description
         self._data_key: str = description.key
 
         self._device = device
+        self._config_entry_id = config_entry_id
 
         self._attr_unique_id = f"{self._data_key}_{device.unique_id}"
 
@@ -111,11 +118,9 @@ class DsSensor(SensorEntity):
         """Link the sensor to its gateway device via the registry id."""
         via_device_id = None
         if self.hass is not None:
-            dev_reg = dr.async_get(self.hass)
-            if parent := dev_reg.async_get_device(
-                identifiers={(DOMAIN, self._device.gateway_id)}
-            ):
-                via_device_id = parent.id
+            via_device_id = get_device_id_by_gateway(
+                self.hass, self._device.gateway_id, self._config_entry_id
+            )
         info = DeviceInfo(
             identifiers={(DOMAIN, self._device.unique_id)},
             name=build_sensor_device_name(self._device.alias),
@@ -133,7 +138,7 @@ class DsSensor(SensorEntity):
 
     def _handle_sensor_hook(self, device: Sensor) -> None:
         self._parse_data(device)
-        self.schedule_update_ha_state()
+        schedule_update_if_enabled(self)
 
 
 class DsVentSensor(SensorEntity):
@@ -141,11 +146,18 @@ class DsVentSensor(SensorEntity):
 
     _attr_should_poll: bool = False
 
-    def __init__(self, service: Service, device: Ventilation, data_key: str):
+    def __init__(
+        self,
+        service: Service,
+        device: Ventilation,
+        data_key: str,
+        config_entry_id: str,
+    ):
         """Initialize the Daikin Ventilation Sensor."""
         self._data_key = data_key
         self._device = device
         self._service = service
+        self._config_entry_id = config_entry_id
 
         sensor_info = SMALL_VAM_SENSOR_TYPES.get(data_key)
         self._attr_has_entity_name = True
@@ -163,11 +175,9 @@ class DsVentSensor(SensorEntity):
         """Link the vent sensor to its gateway device via the registry id."""
         via_device_id = None
         if self.hass is not None:
-            dev_reg = dr.async_get(self.hass)
-            if parent := dev_reg.async_get_device(
-                identifiers={(DOMAIN, self._device.gateway_id)}
-            ):
-                via_device_id = parent.id
+            via_device_id = get_device_id_by_gateway(
+                self.hass, self._device.gateway_id, self._config_entry_id
+            )
         info = DeviceInfo(
             identifiers={(DOMAIN, self._device.unique_id)},
             name=f"新风 {self._device.alias}",
@@ -199,7 +209,7 @@ class DsVentSensor(SensorEntity):
             vent: Ventilation = kwargs["vent"]
             self._parse_data(vent.status)
             _log(display(vent.status))
-        self.schedule_update_ha_state()
+        schedule_update_if_enabled(self)
 
 
 class DsAirYesterdayPowerSensor(CoordinatorEntity[DsAirPowerCoordinator], SensorEntity):

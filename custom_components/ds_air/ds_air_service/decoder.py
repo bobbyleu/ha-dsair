@@ -14,6 +14,7 @@ from .ctrl_enum import (
     EnumFanVolume,
     EnumOutDoorRunCond,
     EnumSensor,
+    EnumSwitch,
     FreshAirHumidification,
     ThreeDFresh,
 )
@@ -1205,11 +1206,15 @@ class VentilationQueryCompositeSituationResult(BaseResult):
 def _parse_hd_switch(raw: int, room: int, unit: int, source: str):
     """解析 HD 开关状态字节。
 
-    协议约定 0=关、1=开。遇到其他值时不再抛 ValueError（否则会导致整条
-    报文被丢弃、实体状态卡死），而是告警并返回 None，保持状态不变。
-    同时用 INFO 日志记录原始值，便于按开/关操作对照确认网关的真实编码。
+    同时兼容两套大金编码约定：
+    - ``EnumControl.Switch``：0=关、1=开（本集成发送控制指令所用）
+    - ``EnumSwitch``：1=开、2=关（部分大金设备的状态回报所用）
+
+    这样即使网关用 2 表示关机，也不会因为原解析抛 ValueError 而丢弃整条
+    报文、导致实体状态卡死在“加热中”。其他未知值仍记录告警并返回 None。
+    原始值始终用 INFO 日志输出，便于后续确认真实编码。
     """
-    if raw == EnumControl.Switch.OFF:
+    if raw in (EnumControl.Switch.OFF, EnumSwitch.OFF):
         result = EnumControl.Switch.OFF
     elif raw == EnumControl.Switch.ON:
         result = EnumControl.Switch.ON
@@ -1217,8 +1222,7 @@ def _parse_hd_switch(raw: int, room: int, unit: int, source: str):
         result = None
         _LOGGER.warning(
             "[DS-AIR HD] %s 收到未知的开关状态原始值 %s (room=%s unit=%s)，"
-            "本字段将被忽略。若开/关设备时该值稳定出现且不为 0/1，"
-            "说明网关的开关编码与当前假设（0=关/1=开）不符，请反馈该日志。",
+            "本字段将被忽略。请反馈该日志以确认网关的真实编码。",
             source,
             raw,
             room,
@@ -1244,6 +1248,9 @@ class HDInfoChangeResult(BaseResult):
         self._status: HDStatus = HDStatus()
 
     def load_bytes(self, b: bytes, config: Config) -> None:
+        _LOGGER.debug(
+            "[DS-AIR HD] 状态推送原始字节: %s", bytes(b).hex(" ")
+        )
         d = Decode(b)
         self._room = d.read1()
         self._unit = d.read1()

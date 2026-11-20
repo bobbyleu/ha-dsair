@@ -6,11 +6,11 @@ import logging
 from homeassistant.components.select import SelectEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import DOMAIN, MANUFACTURER
+from .device_helpers import get_device_id_by_gateway, schedule_update_if_enabled
 from .ds_air_service import (
     EnumControl,
     Service,
@@ -53,8 +53,8 @@ async def async_setup_entry(
     service: Service = hass.data[DOMAIN][config_entry.entry_id]
     entities = []
     for vent in service.get_ventilations():
-        entities.append(DsVentModeSelect(vent, service))
-        entities.append(DsVentAirFlowSelect(vent, service))
+        entities.append(DsVentModeSelect(vent, service, config_entry.entry_id))
+        entities.append(DsVentAirFlowSelect(vent, service, config_entry.entry_id))
     async_add_entities(entities)
 
 
@@ -65,9 +65,12 @@ class DsVentModeSelect(SelectEntity):
     _attr_translation_key = "ventilation_mode"
     _attr_should_poll = False
 
-    def __init__(self, vent: Ventilation, service: Service) -> None:
+    def __init__(
+        self, vent: Ventilation, service: Service, config_entry_id: str
+    ) -> None:
         self._device_info = vent
         self._service = service
+        self._config_entry_id = config_entry_id
         self._attr_unique_id = f"mode_{vent.unique_id}"
 
         if vent.is_small_vam:
@@ -82,11 +85,9 @@ class DsVentModeSelect(SelectEntity):
         """Return device info, linking to the gateway via its registry id."""
         via_device_id = None
         if self.hass is not None:
-            dev_reg = dr.async_get(self.hass)
-            if parent := dev_reg.async_get_device(
-                identifiers={(DOMAIN, self._device_info.gateway_id)}
-            ):
-                via_device_id = parent.id
+            via_device_id = get_device_id_by_gateway(
+                self.hass, self._device_info.gateway_id, self._config_entry_id
+            )
         info = DeviceInfo(
             identifiers={(DOMAIN, self._device_info.unique_id)},
             name=f"新风 {self._device_info.alias}",
@@ -118,7 +119,7 @@ class DsVentModeSelect(SelectEntity):
             self._device_info,
             VentilationStatus(mode=mode),
         )
-        self.schedule_update_ha_state()
+        schedule_update_if_enabled(self)
 
     def _status_change_hook(self, **kwargs) -> None:
         """Handle ventilation status changes."""
@@ -131,7 +132,7 @@ class DsVentModeSelect(SelectEntity):
                 self._device_info.status.mode = new_status.mode
 
         _log(f"vent mode select updated: {self.current_option}")
-        self.schedule_update_ha_state()
+        schedule_update_if_enabled(self)
 
 
 class DsVentAirFlowSelect(SelectEntity):
@@ -141,9 +142,12 @@ class DsVentAirFlowSelect(SelectEntity):
     _attr_translation_key = "ventilation_air_flow"
     _attr_should_poll = False
 
-    def __init__(self, vent: Ventilation, service: Service) -> None:
+    def __init__(
+        self, vent: Ventilation, service: Service, config_entry_id: str
+    ) -> None:
         self._device_info = vent
         self._service = service
+        self._config_entry_id = config_entry_id
         self._attr_unique_id = f"air_flow_{vent.unique_id}"
         if vent.is_small_vam:
             self._attr_options = _VENT_AIR_FLOW_OPTIONS_SMALL_VAM
@@ -157,11 +161,9 @@ class DsVentAirFlowSelect(SelectEntity):
         """Return device info, linking to the gateway via its registry id."""
         via_device_id = None
         if self.hass is not None:
-            dev_reg = dr.async_get(self.hass)
-            if parent := dev_reg.async_get_device(
-                identifiers={(DOMAIN, self._device_info.gateway_id)}
-            ):
-                via_device_id = parent.id
+            via_device_id = get_device_id_by_gateway(
+                self.hass, self._device_info.gateway_id, self._config_entry_id
+            )
         info = DeviceInfo(
             identifiers={(DOMAIN, self._device_info.unique_id)},
             name=f"新风 {self._device_info.alias}",
@@ -187,7 +189,7 @@ class DsVentAirFlowSelect(SelectEntity):
             self._device_info,
             VentilationStatus(air_flow=air_flow),
         )
-        self.schedule_update_ha_state()
+        schedule_update_if_enabled(self)
 
     def _status_change_hook(self, **kwargs) -> None:
         """Handle ventilation status changes."""
@@ -200,4 +202,4 @@ class DsVentAirFlowSelect(SelectEntity):
                 self._device_info.status.air_flow = new_status.air_flow
 
         _log(f"vent air flow select updated: {self.current_option}")
-        self.schedule_update_ha_state()
+        schedule_update_if_enabled(self)

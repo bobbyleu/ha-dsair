@@ -30,11 +30,11 @@ from homeassistant.const import (
 )
 from homeassistant.core import Event, HomeAssistant
 from homeassistant.helpers import config_validation as cv
-from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.event import async_track_state_change_event
 
+from .device_helpers import get_device_id_by_gateway, schedule_update_if_enabled
 from .const import (
     AIR_FLOW_NAME_LIST,
     DOMAIN,
@@ -80,7 +80,9 @@ async def async_setup_entry(
 ) -> None:
     """Set up the climate devices."""
     service: Service = hass.data[DOMAIN][entry.entry_id]
-    climates = [DsAir(service, aircon) for aircon in service.get_aircons()]
+    climates = [
+        DsAir(service, aircon, entry.entry_id) for aircon in service.get_aircons()
+    ]
     async_add_entities(climates)
     link = entry.options.get("link")
     climate_by_unique_id = {climate.unique_id: climate for climate in climates}
@@ -129,20 +131,21 @@ class DsAir(ClimateEntity):
     _attr_precision: float = PRECISION_TENTHS
     _attr_swing_modes: list[str] | None = FAN_DIRECTION_LIST[1:]
     _attr_swing_horizontal_modes: list[str] | None = FAN_DIRECTION_HOR_LIST[1:]
-    _attr_target_temperature_high: float | None = None
-    _attr_target_temperature_low: float | None = None
+    _attr_native_target_temperature_high: float | None = None
+    _attr_native_target_temperature_low: float | None = None
     _attr_target_temperature_step: float | None = 0.5
     _attr_native_temperature_unit: str = UnitOfTemperature.CELSIUS
 
     _enable_turn_on_off_backwards_compatibility: bool = False  # used in 2024.2~2024.12
 
-    def __init__(self, service: Service, aircon: AirCon):
+    def __init__(self, service: Service, aircon: AirCon, config_entry_id: str):
         _log("create aircon:")
         _log(str(aircon.__dict__))
         _log(str(aircon.status.__dict__))
         """Initialize the climate device."""
         self.service = service
         self._device_info = aircon
+        self._config_entry_id = config_entry_id
         self._attr_unique_id = aircon.unique_id
         self.linked_temp_entity_id: str | None = None
         self.linked_humi_entity_id: str | None = None
@@ -183,11 +186,9 @@ class DsAir(ClimateEntity):
         """Link the climate entity to its gateway device via the registry id."""
         via_device_id = None
         if self.hass is not None:
-            dev_reg = dr.async_get(self.hass)
-            if parent := dev_reg.async_get_device(
-                identifiers={(DOMAIN, self._device_info.gateway_id)}
-            ):
-                via_device_id = parent.id
+            via_device_id = get_device_id_by_gateway(
+                self.hass, self._device_info.gateway_id, self._config_entry_id
+            )
         info = DeviceInfo(
             identifiers={(DOMAIN, self.unique_id)},
             name=build_aircon_device_name(self._device_info.alias),
@@ -235,7 +236,7 @@ class DsAir(ClimateEntity):
             if new_status.breathe is not None:
                 status.breathe = new_status.breathe
             _log(display(self._device_info.status))
-        self.schedule_update_ha_state()
+        schedule_update_if_enabled(self)
 
     def update_cur_temp(self, value: str | None) -> None:
         self._link_cur_temp = value is not None
@@ -243,14 +244,14 @@ class DsAir(ClimateEntity):
             self._attr_current_temperature = float(value)
         except ValueError:
             self._attr_current_temperature = None
-        self.schedule_update_ha_state()
+        schedule_update_if_enabled(self)
 
     def update_cur_humi(self, value: str | None) -> None:
         try:
             self._attr_current_humidity = int(float(value))
         except ValueError:
             self._attr_current_humidity = None
-        self.schedule_update_ha_state()
+        schedule_update_if_enabled(self)
 
     @property
     def target_humidity(self) -> float | None:
@@ -291,7 +292,7 @@ class DsAir(ClimateEntity):
         return li
 
     @property
-    def current_temperature(self) -> float | None:
+    def native_current_temperature(self) -> float | None:
         """Return the current temperature."""
         if self._link_cur_temp:
             return self._attr_current_temperature
@@ -301,7 +302,7 @@ class DsAir(ClimateEntity):
         return current_temp / 10 if current_temp is not None else None
 
     @property
-    def target_temperature(self) -> float | None:
+    def native_target_temperature(self) -> float | None:
         """Return the temperature we try to reach."""
         target_temp = self._device_info.status.setted_temp
         return target_temp / 10 if target_temp is not None else None
@@ -369,7 +370,7 @@ class DsAir(ClimateEntity):
                 status.setted_temp = round(temperate * 10.0)
                 new_status.setted_temp = round(temperate * 10.0)
                 self.service.control(self._device_info, new_status)
-                self.schedule_update_ha_state()
+                schedule_update_if_enabled(self)
 
     def set_humidity(self, humidity: int) -> None:
         """Set new humidity level."""
@@ -382,7 +383,7 @@ class DsAir(ClimateEntity):
             status.humidity = EnumControl.Humidity(humidity)
             new_status.humidity = EnumControl.Humidity(humidity)
             self.service.control(self._device_info, new_status)
-            self.schedule_update_ha_state()
+            schedule_update_if_enabled(self)
 
     def set_fan_mode(self, fan_mode: str) -> None:
         """Set new target fan mode."""
@@ -395,7 +396,7 @@ class DsAir(ClimateEntity):
             status.air_flow = get_air_flow_enum(fan_mode)
             new_status.air_flow = get_air_flow_enum(fan_mode)
             self.service.control(self._device_info, new_status)
-            self.schedule_update_ha_state()
+            schedule_update_if_enabled(self)
 
     def set_hvac_mode(self, hvac_mode: HVACMode) -> None:
         """Set new target hvac mode."""
@@ -437,7 +438,7 @@ class DsAir(ClimateEntity):
             status.mode = mode
             new_status.mode = mode
             self.service.control(self._device_info, new_status)
-        self.schedule_update_ha_state()
+        schedule_update_if_enabled(self)
 
     def set_swing_mode(self, swing_mode: str) -> None:
         """Set new vertical swing mode."""
@@ -450,7 +451,7 @@ class DsAir(ClimateEntity):
             status.fan_direction2 = self._device_info.status.fan_direction2
             new_status.fan_direction2 = self._device_info.status.fan_direction2
             self.service.control(self._device_info, new_status)
-            self.schedule_update_ha_state()
+            schedule_update_if_enabled(self)
 
     def set_swing_horizontal_mode(self, swing_horizontal_mode: str) -> None:
         """Set new horizontal swing mode."""
@@ -463,7 +464,7 @@ class DsAir(ClimateEntity):
             status.fan_direction1 = self._device_info.status.fan_direction1
             new_status.fan_direction1 = self._device_info.status.fan_direction1
             self.service.control(self._device_info, new_status)
-            self.schedule_update_ha_state()
+            schedule_update_if_enabled(self)
 
     def set_preset_mode(self, preset_mode: str) -> None:
         """Set new preset mode."""
@@ -486,7 +487,7 @@ class DsAir(ClimateEntity):
         status.mode = mode
         new_status.mode = mode
         self.service.control(self._device_info, new_status)
-        self.schedule_update_ha_state()
+        schedule_update_if_enabled(self)
 
     @property
     def supported_features(self) -> ClimateEntityFeature:

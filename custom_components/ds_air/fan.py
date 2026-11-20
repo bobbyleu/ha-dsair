@@ -12,6 +12,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.entity import DeviceInfo
 
 from .const import DOMAIN
+from .device_helpers import schedule_update_if_enabled
 from .ds_air_service import (
     AirCon,
     AirConStatus,
@@ -121,7 +122,7 @@ class DsVent(FanEntity):
             _log("updated status")
             _log(display(self._device_info.status))
 
-        self.schedule_update_ha_state()
+        schedule_update_if_enabled(self)
 
     @property
     def unique_id(self) -> str:
@@ -188,7 +189,7 @@ class DsVent(FanEntity):
         if air_flow != EnumControl.AirFlow.SUPER_WEAK:
             new_status.air_flow = air_flow
             self._service.control_vent(self._device_info, new_status)
-            self.schedule_update_ha_state()
+            schedule_update_if_enabled(self)
 
     def set_preset_mode(self, preset_mode: str) -> None:
         """Set the preset mode."""
@@ -280,7 +281,7 @@ class BathroomFan(FanEntity):
             if new_status.breathe is not None:
                 status.breathe = new_status.breathe
 
-        self.schedule_update_ha_state()
+        schedule_update_if_enabled(self)
 
     @property
     def unique_id(self) -> str:
@@ -322,7 +323,7 @@ class BathroomFan(FanEntity):
         aircon.status.breathe = breathe
         new_status.breathe = breathe
         self._service.control(aircon, new_status)
-        self.schedule_update_ha_state()
+        schedule_update_if_enabled(self)
 
     def turn_on(self, **kwargs: Any) -> None:
         """Turn on the fan."""
@@ -341,7 +342,7 @@ class BathroomFan(FanEntity):
         new_status.breathe = breathe
         aircon.status.breathe = breathe
         self._service.control(aircon, new_status)
-        self.schedule_update_ha_state()
+        schedule_update_if_enabled(self)
 
     def turn_off(self, **kwargs: Any) -> None:
         """Turn the fan off."""
@@ -350,4 +351,4 @@ class BathroomFan(FanEntity):
         new_status.breathe = EnumControl.Breathe.CLOSE
         aircon.status.breathe = EnumControl.Breathe.CLOSE
         self._service.control(aircon, new_status)
-        self.schedule_update_ha_state()
+        schedule_update_if_enabled(self)
