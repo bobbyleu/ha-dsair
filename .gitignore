@@ -110,6 +110,9 @@ desktop.ini
 # Secrets
 .lokalise_token
 
+# WorkBuddy project data
+.workbuddy/
+
 # monkeytype
 monkeytype.sqlite3
 screen.png
