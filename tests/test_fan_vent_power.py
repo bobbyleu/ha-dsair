@@ -108,6 +108,7 @@ sys.modules["ds_air_under_test.fan"] = fan_mod
 spec.loader.exec_module(fan_mod)
 
 DsVent = fan_mod.DsVent
+DsVentHomeKit = fan_mod.DsVentHomeKit
 
 from ds_air_service.ctrl_enum import EnumControl  # noqa: E402
 from ds_air_service.dao import Ventilation  # noqa: E402
@@ -207,6 +208,54 @@ class StandardVamPowerTests(unittest.TestCase):
         self.fan.set_percentage(0)
         sent = self.service.calls[-1]
         self.assertEqual(sent.switch, EnumControl.Switch.OFF)
+
+
+class HomeKitVentEntityTests(unittest.TestCase):
+    """The HomeKit-dedicated entity must expose exactly one preset mode."""
+
+    def setUp(self):
+        self.service = FakeService()
+        self.vent = Ventilation()
+        self.vent.alias = "客厅"
+        self.vent.is_small_vam = True
+        self.vent.room_id = 3
+        self.vent.unit_id = 1
+        self.vent.status.switch = EnumControl.Switch.ON
+        self.vent.status.air_flow = EnumControl.AirFlow.WEAK
+        self.vent.status.mode = EnumControl.Mode(1)  # 热交换
+        self.fan = DsVentHomeKit(self.vent, self.service)
+
+    def test_unique_id_and_single_preset(self):
+        self.assertTrue(self.fan.unique_id.endswith("_homekit"))
+        self.assertEqual(self.fan._attr_preset_modes, ["自动"])
+
+    def test_device_info_shares_original_device(self):
+        self.assertEqual(
+            self.fan.device_info["identifiers"],
+            {(const_stub.DOMAIN, self.vent.unique_id)},
+        )
+
+    def test_preset_mode_only_reported_in_auto(self):
+        self.assertIsNone(self.fan.preset_mode)
+        self.vent.status.mode = EnumControl.Mode(2)  # 自动
+        self.assertEqual(self.fan.preset_mode, "自动")
+
+    def test_preset_mode_auto_turns_on_and_sets_auto(self):
+        self.vent.status.switch = EnumControl.Switch.OFF
+        self.fan.set_preset_mode("自动")
+        sent = self.service.calls[-1]
+        self.assertEqual(sent.switch, EnumControl.Switch.ON)
+        self.assertEqual(sent.mode, EnumControl.Mode(2))
+
+    def test_auto_off_via_turn_on_percentage_leaves_auto_mode(self):
+        """HomeKit Auto-off calls turn_on(percentage), which must exit Auto."""
+        self.vent.status.mode = EnumControl.Mode(2)  # 自动
+        self.fan.turn_on(percentage=50)
+        sent = self.service.calls[-1]
+        self.assertEqual(sent.switch, EnumControl.Switch.ON)
+        self.assertEqual(sent.mode, EnumControl.Mode(1))  # 热交换
+        self.assertEqual(sent.air_flow, EnumControl.AirFlow.MIDDLE)
+        self.assertIsNone(self.fan.preset_mode)
 
 
 if __name__ == "__main__":

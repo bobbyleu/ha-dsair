@@ -101,6 +101,9 @@
     "fan": {
       "ventilation_switch": {
         "name": "Switch"
+      },
+      "ventilation_homekit": {
+        "name": "HomeKit Vent (Auto)"
       }
     },
     "select": {

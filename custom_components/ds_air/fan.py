@@ -66,6 +66,7 @@ async def async_setup_entry(
     entities = []
     for vent in service.get_ventilations():
         entities.append(DsVent(vent, service))
+        entities.append(DsVentHomeKit(vent, service))
     for aircon in service.get_bathrooms():
         entities.append(BathroomFan(aircon, service))
     async_add_entities(entities)
@@ -247,6 +248,88 @@ class DsVent(FanEntity):
         new_status = VentilationStatus()
         new_status.switch = EnumControl.Switch.OFF
         self._service.control_vent(self._device_info, new_status)
+
+
+class DsVentHomeKit(DsVent):
+    """HomeKit-only ventilation fan shown as one accessory with an Auto toggle.
+
+    HA's HomeKit bridge renders a fan with exactly one preset_mode as a
+    single accessory with an inline Auto toggle (TargetFanState). Two or more
+    preset modes instead become one separate switch per mode. This entity
+    therefore exposes only "自动" so Apple Home shows a single clean fan
+    accessory (on/off + speed + Auto), while the regular DsVent entity keeps
+    all five modes for the HA UI.
+
+    It shares the original device and is meant to be admitted to the HomeKit
+    bridge via its filter (include this entity, exclude the regular DsVent).
+    """
+
+    _attr_translation_key = "ventilation_homekit"
+
+    def __init__(self, vent: Ventilation, service):
+        """Initialize the HomeKit-oriented ventilation fan."""
+        super().__init__(vent, service)
+        self._unique_id = f"{vent.unique_id}_homekit"
+        self._attr_translation_key = "ventilation_homekit"
+        self._attr_preset_modes = ["自动"]
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        """Attach to the same HA device as the original vent entity."""
+        return DeviceInfo(
+            identifiers={(DOMAIN, self._device_info.unique_id)},
+            name=self._device_name,
+            manufacturer="Daikin Industries, Ltd.",
+        )
+
+    @property
+    def preset_mode(self) -> str | None:
+        """Report Auto only in the real Auto mode, so the toggle is meaningful.
+
+        HomeKit sets its single-preset toggle on whenever preset_mode is not
+        None. Returning Auto only in Auto mode lets the toggle reflect the
+        device state; turning it off then switches to a manual mode.
+        """
+        if self._device_info.status.mode == EnumControl.Mode(2):  # AUTO
+            return "自动"
+        return None
+
+    def turn_on(self, **kwargs: Any) -> None:
+        """Handle HomeKit turning the Auto toggle off.
+
+        With a single preset, HomeKit's Auto-off calls turn_on(percentage=...)
+        instead of set_preset_mode. Leave Auto mode in that case so the toggle
+        can actually turn off, while keeping the requested speed.
+        """
+        percentage = kwargs.get("percentage")
+        if percentage is None:
+            super().turn_on(**kwargs)
+            return
+
+        vent = self._device_info
+        new_status = VentilationStatus()
+        if vent.is_small_vam:
+            mode = get_vent_mode_enum_small_vam("热交换")
+        else:
+            mode = get_vent_mode_enum_standard_vam("热交换")
+        if vent.is_small_vam:
+            air_flow = EnumControl.AirFlow(round(percentage / self.percentage_step))
+        else:
+            if percentage > 66:
+                air_flow = EnumControl.AirFlow.STRONG
+            elif percentage > 33:
+                air_flow = EnumControl.AirFlow.MIDDLE
+            else:
+                air_flow = EnumControl.AirFlow.WEAK
+
+        new_status.switch = EnumControl.Switch.ON
+        new_status.mode = mode
+        new_status.air_flow = air_flow
+        vent.status.switch = EnumControl.Switch.ON
+        vent.status.mode = mode
+        vent.status.air_flow = air_flow
+        self._service.control_vent(vent, new_status)
+        schedule_update_if_enabled(self)
 
 
 class BathroomFan(FanEntity):

@@ -114,11 +114,13 @@ class DsVentModeSelect(SelectEntity):
         else:
             mode = get_vent_mode_enum_standard_vam(option)
 
+        new_status = VentilationStatus(mode=mode)
+        # 关机状态下切模式时补下发开机命令，避免只改模式而不启动新风。
+        if self._device_info.status.switch != EnumControl.Switch.ON:
+            new_status.switch = EnumControl.Switch.ON
+            self._device_info.status.switch = EnumControl.Switch.ON
         self._device_info.status.mode = mode
-        self._service.control_vent(
-            self._device_info,
-            VentilationStatus(mode=mode),
-        )
+        self._service.control_vent(self._device_info, new_status)
         schedule_update_if_enabled(self)
 
     def _status_change_hook(self, **kwargs) -> None:
@@ -184,11 +186,13 @@ class DsVentAirFlowSelect(SelectEntity):
     def select_option(self, option: str) -> None:
         """Select ventilation air flow."""
         air_flow = _VENT_AIR_FLOW_BY_OPTION[option]
+        new_status = VentilationStatus(air_flow=air_flow)
+        # 关机状态下调风量时补下发开机命令，避免只改风量而不启动新风。
+        if self._device_info.status.switch != EnumControl.Switch.ON:
+            new_status.switch = EnumControl.Switch.ON
+            self._device_info.status.switch = EnumControl.Switch.ON
         self._device_info.status.air_flow = air_flow
-        self._service.control_vent(
-            self._device_info,
-            VentilationStatus(air_flow=air_flow),
-        )
+        self._service.control_vent(self._device_info, new_status)
         schedule_update_if_enabled(self)
 
     def _status_change_hook(self, **kwargs) -> None:

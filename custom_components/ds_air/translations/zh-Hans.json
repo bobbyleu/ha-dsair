@@ -101,6 +101,9 @@
     "fan": {
       "ventilation_switch": {
         "name": "开关"
+      },
+      "ventilation_homekit": {
+        "name": "HomeKit 新风（自动）"
       }
     },
     "select": {

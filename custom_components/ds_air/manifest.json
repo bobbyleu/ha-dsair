@@ -10,5 +10,5 @@
   "iot_class": "local_polling",
   "issue_tracker": "https://github.com/bobbyleu/ha-dsair/issues",
   "requirements": [],
-  "version": "2.3.0-alpha.1-bobbyleu.1"
+  "version": "2.3.0-alpha.1-bobbyleu.2"
 }
