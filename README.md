@@ -6,10 +6,10 @@
 |------|------|
 | **原作者 / Original author** | [mypal](https://github.com/mypal/ha-dsair)（wangsc100@gmail.com）。原始实现与版权归其所有，感谢 mypal 的原创工作。 |
 | **修改者 / Maintainer** | [bobbyleu](https://github.com/bobbyleu/ha-dsair)（bobbyleu@163.com）。本仓库为其维护的分叉版本，并非从零创作。 |
-| **修改基线 / Based on** | mypal 上游 `2.3.0-alpha.1`（分叉点），当前分叉版本 `2.3.0-alpha.1-bobbyleu.2`。 |
-| **修改了什么 / Changes** | ① Home Assistant 新版本兼容性修复（弃用告警、实体刷新线程安全、启动即轮询状态）；② 新增浴室空调换气扇独立 `fan` 实体；③ 新增金制空气云端电量统计与原生能源面板集成；④ 支持垂直/水平风向独立控制及 Emoji 图标；⑤ 修复小新风（Small VAM）经 HomeKit Bridge 自动化只调风量、无法开机的问题：设风速、预设模式时显式下发开机命令，风速归零时下发关机命令；⑥ 新增 HomeKit 专用新风实体（`*_homekit`），在苹果家庭中呈现为「开关 + 风速 + 自动」单一配件，不再为每个模式生成独立开关；同时修复通过「模式/风量」select 实体在关机状态下切换时不开机的问题。 |
+| **修改基线 / Based on** | mypal 上游 `2.3.0-alpha.1`（分叉点），当前分叉版本 `2.3.0-alpha.1-bobbyleu.3`。 |
+| **修改了什么 / Changes** | ① Home Assistant 新版本兼容性修复（弃用告警、实体刷新线程安全、启动即轮询状态）；② 新增浴室空调换气扇独立 `fan` 实体；③ 新增金制空气云端电量统计与原生能源面板集成；④ 支持垂直/水平风向独立控制及 Emoji 图标；⑤ 修复小新风（Small VAM）经 HomeKit Bridge 自动化只调风量、无法开机的问题：设风速、预设模式时显式下发开机命令，风速归零时下发关机命令。 |
 
-> **版本命名 / Versioning**：本仓库沿用 `<上游版本>-bobbyleu.<N>` 命名方案（与 rinnai_smart 一致）。`<上游版本>` 是本分叉所基于的 mypal 上游版本（当前为 `2.3.0-alpha.1`），`<N>` 是本分叉自身的修订序号。例如 `2.3.0-alpha.1-bobbyleu.2` 表示「基于上游 2.3.0-alpha.1 的第 2 次修订」。
+> **版本命名 / Versioning**：本仓库沿用 `<上游版本>-bobbyleu.<N>` 命名方案（与 rinnai_smart 一致）。`<上游版本>` 是本分叉所基于的 mypal 上游版本（当前为 `2.3.0-alpha.1`），`<N>` 是本分叉自身的修订序号。例如 `2.3.0-alpha.1-bobbyleu.1` 表示「基于上游 2.3.0-alpha.1 的第 1 次修订」。
 >
 > This integration was originally created by [mypal](https://github.com/mypal/ha-dsair) and is currently forked and maintained by [bobbyleu](https://github.com/bobbyleu/ha-dsair), based on upstream `2.3.0-alpha.1`. This fork is not an original work; it focuses on compatibility fixes for newer Home Assistant versions, bug fixes, and the additions listed above.
 
@@ -40,28 +40,6 @@
 * 转角卫士
 * 金制家中用防护组件
 * 显示屏(黑奢系列)
-
-# HomeKit 单配件新风
-
-大金新风的 5 个模式（内循环/热交换/自动/防污染/排异味）如果直接接入 HomeKit Bridge，桥接层会为每个模式生成一个独立开关，苹果家庭里会出现 5 个零散开关。为此本版本额外创建一个 HomeKit 专用实体：
-
-| 实体 | 用途 | 模式 |
-|------|------|------|
-| `fan.新风_<房间>_开关`（原实体） | HA 界面使用，保持不变 | 5 个模式全部保留 |
-| `fan.新风_<房间>_homekit_*`（新实体） | 只给 HomeKit 使用 | 仅 1 个「自动」模式 |
-
-HA 的 HomeKit 桥接层规则是：当风扇只有 1 个 preset 模式时，把它渲染成**一个配件**（开关 + 风速滑块 + 内嵌「自动」按钮），而不再为每个模式生成独立开关。新实体就利用这一规则。「自动」按钮打开时切换到自动模式并开机；关闭时退出自动模式、按当前风速继续运行。
-
-新实体与原实体属于同一个 HA 设备，不会在设备页重复出现。为了不影响 HA 界面，建议将其在 HA 前端隐藏（设置 → 设备与服务 → 实体 → 搜索 `homekit` → 隐藏）；隐藏不影响 HomeKit 桥接。
-
-## HomeKit Bridge 配置
-
-在 HA 的 HomeKit Bridge 集成配置里，需要**包含新实体、排除原实体**，二选一操作：
-
-- **方式一（推荐，只桥接新风时）**：HomeKit Bridge → 配置 → 「包含」选项卡，只勾选 `fan.新风_<房间>_homekit_*`，不勾选原来的 `fan.新风_<房间>_开关`。
-- **方式二（已在桥接其它设备）**：HomeKit Bridge → 配置 → 「排除」选项卡，加入原来的 `fan.新风_<房间>_开关`，并确保新实体在包含列表中。
-
-修改后重载 HomeKit Bridge，苹果家庭中原来的 5 个模式开关会消失，只留下一个「新风」配件（开关 + 风速 + 自动）。HA 内的原实体功能不受影响。
 
 # 浴室空调换气扇
 
