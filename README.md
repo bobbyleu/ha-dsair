@@ -1,8 +1,17 @@
 # Daikin DS-AIR Custom Component For Home Assistant
 
-> **署名说明 / Attribution**：本集成原作者为 [mypal](https://github.com/mypal/ha-dsair)，原始实现与版权归其所有。本仓库（[bobbyleu/ha-dsair](https://github.com/bobbyleu/ha-dsair)）是由 bobbyleu 基于原项目修订维护的分叉版本，主要进行 Home Assistant 新版本兼容性修复与错误修正，并非从零创作。感谢 mypal 的原创工作。
+## 关于本集成 / About this integration
+
+| 项目 | 说明 |
+|------|------|
+| **原作者 / Original author** | [mypal](https://github.com/mypal/ha-dsair)（wangsc100@gmail.com）。原始实现与版权归其所有，感谢 mypal 的原创工作。 |
+| **修改者 / Maintainer** | [bobbyleu](https://github.com/bobbyleu/ha-dsair)（bobbyleu@163.com）。本仓库为其维护的分叉版本，并非从零创作。 |
+| **修改基线 / Based on** | mypal 上游 `2.3.0-alpha.1`（分叉点），当前分叉版本 `2.3.0-alpha.1-bobbyleu.1`。 |
+| **修改了什么 / Changes** | ① Home Assistant 新版本兼容性修复（弃用告警、实体刷新线程安全、启动即轮询状态）；② 新增浴室空调换气扇独立 `fan` 实体；③ 新增金制空气云端电量统计与原生能源面板集成；④ 支持垂直/水平风向独立控制及 Emoji 图标；⑤ 修复小新风（Small VAM）经 HomeKit Bridge 自动化只调风量、无法开机的问题：设风速、预设模式时显式下发开机命令，风速归零时下发关机命令。 |
+
+> **版本命名 / Versioning**：本仓库沿用 `<上游版本>-bobbyleu.<N>` 命名方案（与 rinnai_smart 一致）。`<上游版本>` 是本分叉所基于的 mypal 上游版本（当前为 `2.3.0-alpha.1`），`<N>` 是本分叉自身的修订序号。例如 `2.3.0-alpha.1-bobbyleu.1` 表示「基于上游 2.3.0-alpha.1 的第 1 次修订」。
 >
-> This integration was originally created by [mypal](https://github.com/mypal/ha-dsair). This repository is a fork maintained and revised by bobbyleu, containing compatibility fixes for newer Home Assistant versions and bug fixes. It is not an original work by the maintainer.
+> This integration was originally created by [mypal](https://github.com/mypal/ha-dsair) and is currently forked and maintained by [bobbyleu](https://github.com/bobbyleu/ha-dsair), based on upstream `2.3.0-alpha.1`. This fork is not an original work; it focuses on compatibility fixes for newer Home Assistant versions, bug fixes, and the additions listed above.
 
 此项目是Home Assistant平台[DS-AIR](https://www.daikin-china.com.cn/newha/products/4/19/DS-AIR/)以及[金制空气](https://www.daikin-china.com.cn/newha/products/4/19/jzkq/)自定义组件的实现。
 

@@ -179,15 +179,23 @@ class DsVent(FanEntity):
             else:
                 air_flow = vent.status.air_flow
 
-            if (
-                percentage > 0
-                and vent.status.switch != EnumControl.Switch.ON
-            ):
-                new_status.switch = EnumControl.Switch.ON
+        # HomeKit 同时下发 Active=1 与 Rotation Speed 时，HA 桥接层只会调用
+        # set_percentage，不会再调 turn_on。因此设风速时必须显式带上开关
+        # 命令，否则 small VAM 只会改风量、不会开机。
+        if percentage <= 0:
+            # 风速归零视为关机，与 HA 风扇语义保持一致
+            new_status.switch = EnumControl.Switch.OFF
+            vent.status.switch = EnumControl.Switch.OFF
+        elif vent.status.switch != EnumControl.Switch.ON:
+            new_status.switch = EnumControl.Switch.ON
+            vent.status.switch = EnumControl.Switch.ON
 
         vent.status.air_flow = air_flow
         if air_flow != EnumControl.AirFlow.SUPER_WEAK:
             new_status.air_flow = air_flow
+
+        # 即使风量未变化（SUPER_WEAK），开关命令也必须下发
+        if new_status.switch is not None or new_status.air_flow is not None:
             self._service.control_vent(self._device_info, new_status)
             schedule_update_if_enabled(self)
 
@@ -201,7 +209,13 @@ class DsVent(FanEntity):
             mode = get_vent_mode_enum_standard_vam(preset_mode)
         vent.status.mode = mode
         new_status.mode = mode
+        # HomeKit 的 preset 开关打开时只调用 set_preset_mode；若设备处于
+        # 关机状态需一并开机，否则只切换模式而新风不会启动。
+        if vent.status.switch != EnumControl.Switch.ON:
+            new_status.switch = EnumControl.Switch.ON
+            vent.status.switch = EnumControl.Switch.ON
         self._service.control_vent(self._device_info, new_status)
+        schedule_update_if_enabled(self)
 
     @property
     def preset_mode(self) -> str | None:
